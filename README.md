@@ -5,10 +5,11 @@ In particular, uses interval bound propagation (WIP), linear programming (WIP), 
 
 ## Instructions to run
 1. Create a virtual environment using `python3 -m venv venv_mnist_verification`.
-2. Run the command `source venv_mnist_verification/bin/activate`.
-3. Run the command `pip install -r requirements.txt`.
-4. Run the command `python mnist.py`. This will train an MLP on the MNIST dataset, downloading the dataset if necessary, and save the model state dictionary to `mnist_model.pt`.
-5. Run one of: `python verify_mnist_IBP.py`, `python verify_mnist_LP.py`, `python verify_mnist_MILP.py`.
+1. Run the command `source venv_mnist_verification/bin/activate`.
+1. Run the command `pip install -r requirements.txt`.
+1. In `mnist.py`, edit the device to one supported on your system. This should be one of `{"cpu", "mps", "cuda"}` or another accelerator backend supported by torch 2.0. I use mps as I ran this on a MacBook with M2 silicon.
+1. Run the command `python mnist.py`. This will train an MLP on the MNIST dataset, downloading the dataset if necessary, and save the model state dictionary to `mnist_model.pt`.
+1. Run one of: `python verify_mnist_IBP.py`, `python verify_mnist_LP.py`, `python verify_mnist_MILP.py`.
 
 You can also import the `MNISTModelVerifier` class and use it as desired. 
 
