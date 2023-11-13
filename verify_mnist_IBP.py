@@ -4,7 +4,7 @@ from gurobipy import GRB, quicksum, max_
 from tqdm import trange
 
 from mnist import validation_dataset, load_MNIST_model
-from utils import get_gurobi_model
+from gurobi_utils import get_gurobi_model
 
 
 class MNISTModelVerifier:
