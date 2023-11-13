@@ -108,12 +108,12 @@ if __name__ == "__main__":
     #                                                return_counterexample=True)
 
     epsilon = 0.08
-    for idx, (perturbed_image, label) in enumerate(validation_dataset):
-        verified, counterexample = verifier.verify_one(perturbed_image, label, epsilon=epsilon, silence_gurobi=True,
+    for idx, (original_image, label) in enumerate(validation_dataset):
+        verified, counterexample = verifier.verify_one(original_image, label, epsilon=epsilon, silence_gurobi=True,
                                                        save_solution=True,
                                                        return_counterexample=True)
         if not verified:
-            to_pil_image(perturbed_image.reshape(1, 28, 28)).resize((256, 256)).show()
+            to_pil_image(original_image.reshape(1, 28, 28)).resize((256, 256)).show()
             to_pil_image(counterexample.reshape(1, 28, 28)).resize((256, 256)).show()
             print(f"Real label is {label}, model predicts {verifier.net(counterexample).argmax(1).item()}")
         else:
