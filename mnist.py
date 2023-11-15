@@ -60,7 +60,7 @@ class MNISTModel(nn.Module):
             modules.append(activation)
         modules.append(nn.Linear(layer_sizes[-2], layer_sizes[-1]))
 
-        self.net = nn.Sequential(modules)
+        self.net = nn.Sequential(*modules)
 
     def forward(self, x):
         return self.net(x)
