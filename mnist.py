@@ -1,3 +1,9 @@
+"""
+Contains the MNISTModel class the other scripts are built to verify, as well as: the training and validation datasets;
+    a Trainer class built to train the model on the datasets; and a helper function to load an instance of the MNISTModel
+    from a state dictionary file.
+"""
+
 import random
 from statistics import mean
 
@@ -15,31 +21,66 @@ train_dataset = mnist.MNIST(root="./data", train=True, transform=to_tensor, down
 validation_dataset = mnist.MNIST(root="./data", train=False, transform=to_tensor, download=True)
 
 
-def load_MNIST_model(hidden_size=100, filename="mnist_model.pt"):
-    model = MNISTModel(hidden_size=hidden_size)
+def load_MNIST_model(layer_sizes=(784, 100, 100, 10), activation=None, flatten=True, filename="mnist_model.pt"):
+    """
+    Construct an MNISTModel and load state dictionary from a file.
+    :param layer_sizes: An iterable of the number of neurons in each layer. Defaults to (28x28, 100, 100, 10), ie,
+                        an MLP for the MNIST problem using 2 hidden layers, 784 input neurons, and 10 output classes.
+    :param activation: The activation module used in the original model. If None, uses default from MNISTModel class.
+    :param flatten: Whether the original model had an nn.Flatten layer at the start. Default True.
+    :param filename: Where to look for the saved state dictionary. Default mnist_model.pt.
+    :return: The reinstantiated model, loaded with saved weights.
+    """
+    model = MNISTModel(layer_sizes=layer_sizes, activation=activation, flatten=flatten)
     model.load_state_dict(torch.load(filename))
     return model
 
 
 class MNISTModel(nn.Module):
-    def __init__(self, hidden_size=100):
+    """
+    A generic MLP with defaults designed for the MNIST classification problem: 784 input pixels and 10 classes.
+    """
+
+    def __init__(self, layer_sizes=(784, 100, 100, 10), activation=None, flatten=True):
+        """
+        Creates an MLP for the MNIST classification problem.
+        :param layer_sizes: An iterable of the number of neurons in each layer. Defaults to (28x28, 100, 100, 10), ie,
+                        2 hidden layers of 100 neurons each, 784 input neurons, and 10 output classes.
+        :param activation: An activation module to use between Linear layers. If None, uses nn.ReLU()
+        :param flatten: Whether to include an nn.Flatten() layer at the start of the net. Default True
+        """
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Flatten(),
-            # nn.BatchNorm1d(28 * 28),
-            nn.Linear(28 * 28, hidden_size),
-            nn.ReLU(),
-            # nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, 10)
-        )
+        activation = activation or nn.ReLU()
+
+        modules = nn.ModuleList()
+        if flatten:
+            modules.append(nn.Flatten())
+        for num_in, num_out in zip(layer_sizes[:-2], layer_sizes[1:-1]):
+            modules.append(nn.Linear(num_in, num_out))
+            modules.append(activation)
+        modules.append(nn.Linear(layer_sizes[-2], layer_sizes[-1]))
+
+        self.net = nn.Sequential(modules)
 
     def forward(self, x):
         return self.net(x)
 
 
 class MNISTTrainer:
+    """
+    A helper class designed to train an MNISTModel on the MNIST dataset.
+    """
+
     def __init__(self, model, train_dataloader, validation_dataloader=None, criterion=None, optimizer=None,
                  device=None):
+        """
+        :param model: The model to train. Written for MNISTModel
+        :param train_dataloader: The training dataloader. Written to use the MNIST dataset. Images should be tensors.
+        :param validation_dataloader: If None, validation will not be performed; otherwise, it will be done every epoch.
+        :param criterion: Loss function. If None, uses nn.CrossEntropyLoss()
+        :param optimizer: Optimizer. If None, uses Adam with lr=3e-4
+        :param device: The device to train on. If None, uses the cpu.
+        """
         self.model = model
         self.train_dataloader = train_dataloader
         self.validation_dataloader = validation_dataloader
@@ -108,17 +149,24 @@ class MNISTTrainer:
 
 
 if __name__ == "__main__":
-    # Train
+    # Example usage:
+
+    # Train a default MNISTModel on the dataset for 15 epochs
     train_dataloader = DataLoader(train_dataset, batch_size=1000)
     validation_dataloader = DataLoader(validation_dataset, batch_size=1000)
-    device = torch.device("mps")  # Could be cuda, mps, ...
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
     trainer = MNISTTrainer(model=MNISTModel(), train_dataloader=train_dataloader,
                            validation_dataloader=validation_dataloader, device=device)
 
     epochs = 15
     all_losses, mean_validation_losses, mean_validation_accuracies = trainer.train_epochs(epochs)
 
-    # Plot
+    # Plot losses and accuracies
     plt.figure(1)
     plt.title("Training losses")
     plt.xlabel("Step")
@@ -136,7 +184,7 @@ if __name__ == "__main__":
     plt.plot(range(1, epochs + 1), mean_validation_accuracies)
     plt.show()
 
-    # Verify qualitatively
+    # Verify qualitatively using a random image from the validation dataset
     model = trainer.model
     model.eval()
     print(f"Model has {sum(p.numel() for p in model.parameters())} parameters.")
