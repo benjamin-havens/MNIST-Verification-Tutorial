@@ -1,8 +1,6 @@
-import contextlib
-import os
-import sys
-
 from gurobipy import Model, GRB
+
+from printing_utils import suppress_stdout
 
 GRB_STATUS_MEANING = {
     GRB.Status.LOADED: "LOADED",
@@ -21,17 +19,6 @@ GRB_STATUS_MEANING = {
     GRB.Status.INPROGRESS: "INPROGRESS",
     GRB.Status.USER_OBJ_LIMIT: "USER_OBJ_LIMIT",
 }
-
-
-@contextlib.contextmanager
-def suppress_stdout():
-    with open(os.devnull, "w") as fnull:
-        original_stdout = sys.stdout
-        sys.stdout = fnull
-        try:
-            yield
-        finally:
-            sys.stdout = original_stdout
 
 
 def get_gurobi_model(silence=True):

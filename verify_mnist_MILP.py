@@ -12,8 +12,9 @@ from gurobipy import GRB, quicksum, max_
 from torchvision.transforms.v2.functional import to_pil_image
 from tqdm import trange
 
-from gurobi_utils import get_gurobi_model, delete_last_line
+from gurobi_utils import get_gurobi_model
 from mnist import validation_dataset, load_MNIST_model
+from printing_utils import delete_last_line
 
 
 class MNISTModelVerifier:
