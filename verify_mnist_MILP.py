@@ -39,7 +39,7 @@ class MNISTModelVerifier:
         :param dataset: An MNIST dataset--iterable of (image, label) tensors. Should support indexing or return value
                         will not be meaningful.
         :param epsilon: Perturbation level. Each pixel may be independently perturbed within [pixel - epsilon, pixel +
-                        epsilon], clamped at [0, 1]
+                        epsilon], clamped at [0, 1], creating an L-infinity ball with the image at the center.
         :param silence_gurobi: Whether to silence output from the gurobi LP solver. Default True.
         :param silence_tqdm: Whether to silence the progress bars. Default False.
         :param silence_print: Whether to silence print statements. Default True.
