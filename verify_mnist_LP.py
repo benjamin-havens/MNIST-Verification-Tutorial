@@ -163,5 +163,5 @@ if __name__ == "__main__":
     verifier.verify(dataset=dataset, epsilon=0.05, silence_print=False)
 
     # 2. Verify a specific image, saving the solution to a file
-    verified = verifier.verify_one(*dataset[0], epsilon=0.05, save_solution_filename="LP.txt")
+    verified = verifier.verify_one(*dataset[0], epsilon=0.05, save_solution_filename="LP_solution.txt")
 
