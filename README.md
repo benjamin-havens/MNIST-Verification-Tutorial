@@ -5,20 +5,22 @@ In particular, uses interval bound propagation (WIP), linear programming (WIP), 
 
 ## Instructions to run
 1. Create a virtual environment using `python3 -m venv venv_mnist_verification`.
-1. Run the command `source venv_mnist_verification/bin/activate`.
-1. Run the command `pip install -r requirements.txt`.
-1. In `mnist.py`, edit the device to one supported on your system. This should be one of `{"cpu", "mps", "cuda"}` or another accelerator backend supported by torch 2.0. I use mps as I ran this on a MacBook with M2 silicon.
-1. Run the command `python mnist.py`. This will train an MLP on the MNIST dataset, downloading the dataset if necessary, and save the model state dictionary to `mnist_model.pt`.
-1. Run one of: `python verify_mnist_IBP.py`, `python verify_mnist_LP.py`, `python verify_mnist_MILP.py`.
+2. Run the command `source venv_mnist_verification/bin/activate`.
+3. Run the command `pip install -r requirements.txt`.
+4. Run the command `python mnist.py`. This will train an MLP on the MNIST dataset, downloading the dataset if necessary, and save the model state dictionary to `mnist_model.pt`. It will use CUDA if available, else MPS, else CPU.
+5. Run one of: `python verify_mnist_IBP.py`, `python verify_mnist_LP.py`, `python verify_mnist_MILP.py`.
 
-You can also import the `MNISTModelVerifier` class and use it as desired. 
+You can also just import the `MNISTModelVerifier` class and use it as desired. The last step in the above instructions just runs the example usage from the bottom of each file.
 
-I created and ran this project in Python 3.11, but it should work for lower versions. I have not tested this, but I'd guess 3.9 or even 3.8 would work.
+I created and ran this project in Python 3.11. Lower versions may also work.
 
 ## TODO
-- finish updating README, with sources, further instructions
 - create tutorial
 - account for batchnorm for increased performance and test for improved verifiability
-- comment/document the code
-- identify and fix problem in LP or IBP formulation
 
+## Citations
+Salman, Hadi, et al. "A convex relaxation barrier to tight robustness verification of neural networks." Advances in Neural Information Processing Systems 32 (2019).
+
+Tjeng, Vincent, Kai Xiao, and Russ Tedrake. "Evaluating robustness of neural networks with mixed integer programming." arXiv preprint arXiv:1711.07356 (2017).
+
+LeCun, Yann, et al. "Gradient-based learning applied to document recognition." Proceedings of the IEEE 86.11 (1998): 2278-2324.
