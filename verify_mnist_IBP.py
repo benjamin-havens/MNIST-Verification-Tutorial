@@ -1,17 +1,44 @@
+"""
+This script using Interval Bound Propagation to verify model performance.
+Gives bounds only, so if the model passes verification on a given image, performance is guaranteed; however, if the model
+    fails verification on a given image, it not actually misclassify any images perturbed in plus or minus epsilon. That
+    is to say, false negatives are impossible, but false positives are possible.
+"""
+
 import numpy as np
 import torch
 from gurobipy import GRB, quicksum, max_
 from tqdm import trange
 
-from mnist import validation_dataset, load_MNIST_model
 from gurobi_utils import get_gurobi_model
+from mnist import validation_dataset, load_MNIST_model
 
 
 class MNISTModelVerifier:
+    """
+    This class uses Interval Bound Propagation to verify performance of an MNISTModel.
+    """
+
     def __init__(self, model=None):
+        """
+        Saves or creates an MNISTModel for later verification.
+        :param model: The MNISTModel instance to verify. If None, will attempt to load from the default configuration
+                        (2 layers of 100 hidden units, located at mnist_model.pt)
+        """
         self.net = model or load_MNIST_model()
 
     def verify(self, dataset, epsilon, silence_gurobi=True, silence_tqdm=False, silence_print=True):
+        """
+        Verify performance of self.model on dataset with perturbation level epsilon, return the indices of verified images.
+        :param dataset: An MNIST dataset--iterable of (image, label) tensors. Should support indexing or return value
+                        will not be meaningful.
+        :param epsilon: Perturbation level. Each pixel may be independently perturbed within [pixel - epsilon, pixel +
+                        epsilon], clamped at [0, 1], creating an L-infinity ball with the image at the center.
+        :param silence_gurobi: Whether to silence output from the gurobi LP solver. Default True.
+        :param silence_tqdm: Whether to silence the progress bars. Default False.
+        :param silence_print: Whether to silence print statements. Default True.
+        :return: List of verified images from the dataset.
+        """
         loop = trange(len(dataset), disable=silence_tqdm, leave=False)
         loop.set_description("Verification")
         verified = [index for index in loop if self.verify_one(*dataset[index], epsilon, silence_gurobi=silence_gurobi)]
@@ -23,11 +50,22 @@ class MNISTModelVerifier:
                 print("Verified: ", verified)
         return verified
 
-    def verify_one(self, image, label, epsilon, save_solution=False, silence_gurobi=True):
-        bound = self._get_bound(image, label, epsilon, save_solution=save_solution, silence_gurobi=silence_gurobi)
+    def verify_one(self, image, label, epsilon, save_solution_filename=None, silence_gurobi=True):
+        """
+        Verify performance on a single instance.
+        :param image: Image tensor from the MNIST dataset. Should have 28x28 pixels.
+        :param label: The corresponding label.
+        :param epsilon: Perturbation level. Each pixel may be independently perturbed within [pixel - epsilon, pixel +
+                        epsilon], clamped at [0, 1]
+        :param save_solution_filename: If provided, will save all variables from the solver to this location.
+        :param silence_gurobi: Whether to silence output from the gurobi LP solver.
+        :return: True if the model's performance was verified on this image, else False.
+        """
+        bound = self._get_bound(image, label, epsilon, save_solution_filename=save_solution_filename,
+                                silence_gurobi=silence_gurobi)
         return bound > 0
 
-    def _get_bound(self, image, label, epsilon, save_solution=False, silence_gurobi=True):
+    def _get_bound(self, image, label, epsilon, save_solution_filename=None, silence_gurobi=True):
         m = get_gurobi_model(silence_gurobi)
 
         # Add the input neuron variables and constraints
@@ -41,12 +79,15 @@ class MNISTModelVerifier:
         # Go through sequential net and add constraints and variables
         for index, module in enumerate(self.net.net):
             if isinstance(module, torch.nn.Linear):
+                # For linear layers, we extract parameters from the model and create exact constraints between
+                # activations from the previous layer and pre-activation values for the next layer.
+                # We also propagate the interval bound to the next layer.
                 parameters = dict(module.named_parameters())
                 weight = parameters["weight"].detach().numpy()
                 bias = parameters["bias"].detach().numpy()
                 n_out, n_in = weight.shape
 
-                # Update bounds
+                # Update bounds--negative weights contribute the upper bound to the new lower bound and vice versa
                 new_lb = np.zeros(n_out)
                 new_ub = np.zeros(n_out)
                 for i in range(n_out):
@@ -70,6 +111,10 @@ class MNISTModelVerifier:
 
                 n_in = n_out
             elif isinstance(module, torch.nn.ReLU):
+                # For ReLU layers, we use the lower and upper bounds from previous layers to create bounds, using the
+                # triangle relaxation. This is where inexactness is introduced, meaning that failed verification may
+                # be a false postive.
+
                 # Update bounds
                 new_lb = lb.clip(min=0)
                 new_ub = ub.clip(min=0)
@@ -95,8 +140,6 @@ class MNISTModelVerifier:
                 lb, ub = new_lb, new_ub
             elif isinstance(module, torch.nn.Flatten):
                 pass
-            elif isinstance(module, torch.nn.BatchNorm1d):
-                pass  # TODO: account for batchnorm
             else:
                 raise TypeError(f"Verifier not equipped to handle layer of type {type(module)}")
 
@@ -108,8 +151,8 @@ class MNISTModelVerifier:
         m.setObjective(output_neurons[label] - max_incorrect_logit, GRB.MINIMIZE)
         m.optimize()
 
-        if save_solution:
-            with open("outputs/LP_solution.txt", "w") as f:
+        if save_solution_filename is not None:
+            with open(save_solution_filename, "w") as f:
                 for v in m.getVars():
                     f.write(f"{v.varName} {v.x:.6}\n")
 
@@ -117,7 +160,12 @@ class MNISTModelVerifier:
 
 
 if __name__ == "__main__":
+    # Example usage:
+
+    # 1. Verify a portion of the validation dataset
     verifier = MNISTModelVerifier()
-    dataset = [validation_dataset[i] for i in range(50)]
-    # verifier.verify(dataset=dataset, epsilon=0.05, silence_gurobi=True, silence_print=False)
-    verifier.verify_one(*dataset[0], epsilon=0.05, silence_gurobi=True, save_solution=True)
+    dataset = [validation_dataset[i] for i in range(10)]
+    verifier.verify(dataset=dataset, epsilon=0.05, silence_print=False)
+
+    # 2. Verify a specific image, saving the solution to a file
+    verified = verifier.verify_one(*dataset[0], epsilon=0.05, save_solution_filename="LP.txt")
